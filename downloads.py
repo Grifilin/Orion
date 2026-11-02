@@ -1,5 +1,4 @@
-import os
-import threading
+import os, threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from network import is_metered
@@ -10,22 +9,14 @@ MOBILE_WARN_BYTES = 20 * 1024 * 1024
 
 class DownloadTask:
     def __init__(self, url, dest_path, threads=DEFAULT_THREADS, on_progress=None, on_done=None, on_error=None):
-        self.url = url
-        self.dest_path = dest_path
-        self.threads = threads
-        self.on_progress = on_progress
-        self.on_done = on_done
-        self.on_error = on_error
-        self.cancelled = False
-        self.downloaded = 0
-        self.total = 0
+        self.url, self.dest_path, self.threads = url, dest_path, threads
+        self.on_progress, self.on_done, self.on_error = on_progress, on_done, on_error
+        self.cancelled, self.downloaded, self.total = False, 0, 0
         self._lock = threading.Lock()
 
     def _head(self):
         r = requests.head(self.url, allow_redirects=True, timeout=15)
-        size = int(r.headers.get('Content-Length', 0))
-        ranges = r.headers.get('Accept-Ranges', 'none').lower() == 'bytes'
-        return size, ranges
+        return int(r.headers.get('Content-Length', 0)), r.headers.get('Accept-Ranges', '').lower() == 'bytes'
 
     def _add_progress(self, n):
         with self._lock:
@@ -49,8 +40,7 @@ class DownloadTask:
             for i in range(self.threads):
                 p = f'{self.dest_path}.part{i}'
                 if os.path.exists(p):
-                    with open(p, 'rb') as f:
-                        out.write(f.read())
+                    with open(p, 'rb') as f: out.write(f.read())
                     os.remove(p)
 
     def start(self):
@@ -76,11 +66,7 @@ class DownloadTask:
 
     def _multi(self):
         chunk_size = self.total // self.threads
-        ranges = []
-        for i in range(self.threads):
-            s = i * chunk_size
-            e = self.total - 1 if i == self.threads - 1 else (i + 1) * chunk_size - 1
-            ranges.append((s, e))
+        ranges = [(i * chunk_size, self.total - 1 if i == self.threads - 1 else (i + 1) * chunk_size - 1) for i in range(self.threads)]
         with ThreadPoolExecutor(max_workers=self.threads) as ex:
             futures = [ex.submit(self._download_chunk, s, e, i) for i, (s, e) in enumerate(ranges)]
             for f in as_completed(futures): f.result()

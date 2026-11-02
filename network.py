@@ -1,5 +1,4 @@
 from jnius import autoclass
-
 Context = autoclass('android.content.Context')
 ConnectivityManager = autoclass('android.net.ConnectivityManager')
 NetworkCapabilities = autoclass('android.net.NetworkCapabilities')
@@ -15,7 +14,6 @@ def get_network_type():
     if caps is None: return 'none'
     if caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI): return 'wifi'
     if caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR): return 'cellular'
-    if caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET): return 'ethernet'
     return 'unknown'
 
 def is_metered():
